@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>死了吗 - 独居安全确认</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #e0e0e0;
+            --accent-color: #ff3b30;
+            /* 紧急红 */
+            --safe-color: #30d158;
+            /* 安全绿 */
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            /* 防止长按选中文字 */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* 顶部状态栏 */
+        .header {
+            position: absolute;
+            top: 20px;
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .settings-btn {
+            cursor: pointer;
+            border: 1px solid #333;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+
+        /* 核心倒计时区域 */
+        .timer-container {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .status-label {
+            font-size: 16px;
+            color: #888;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .countdown {
+            font-family: var(--font-mono);
+            font-size: 64px;
+            font-weight: bold;
+            color: var(--text-color);
+            letter-spacing: -2px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        .countdown.danger {
+            color: var(--accent-color);
+            animation: pulse 1s infinite;
+        }
+
+        /* 续命按钮 */
+        .btn-alive {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: transparent;
+            border: 2px solid var(--text-color);
+            color: var(--text-color);
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-alive:active {
+            transform: scale(0.95);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-alive span {
+            display: block;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+            font-weight: normal;
+        }
+
+        /* 死亡警告层 */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.1);
+            z-index: 10;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .overlay.active {
+            display: flex;
+            animation: flash 2s infinite;
+        }
+
+        .alert-text {
+            color: var(--accent-color);
+            font-size: 30px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .reset-text {
+            color: #fff;
+            font-size: 14px;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        /* 设置弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 300px;
+            z-index: 20;
+            border: 1px solid #333;
+        }
+
+        .modal h3 {
+            margin-top: 0;
+            color: #fff;
+        }
+
+        .modal label {
+            display: block;
+            margin: 10px 0 5px;
+            color: #888;
+            font-size: 12px;
+        }
+
+        .modal input {
+            width: 100%;
+            background: #333;
+            border: none;
+            padding: 10px;
+            color: #fff;
+            border-radius: 4px;
+        }
+
+        .modal .actions {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .modal button {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes flash {
+            0% {
+                background: rgba(255, 0, 0, 0.1);
+            }
+
+            50% {
+                background: rgba(255, 0, 0, 0.3);
+            }
+
+            100% {
+                background: rgba(255, 0, 0, 0.1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <span id="cycle-display">周期: 24小时</span>
+        <span class="settings-btn" onclick="openSettings()">设置</span>
+    </div>
+
+    <div class="timer-container">
+        <div class="status-label">距离确认死亡还有</div>
+        <div class="countdown" id="timer">00:00:00</div>
+    </div>
+
+    <button class="btn-alive" id="action-btn" onclick="resetTimer()">
+        一键续命
+        <span>I'M STILL ALIVE</span>
+    </button>
+
+    <div class="overlay" id="death-overlay">
+        <div class="alert-text">已触发紧急联系人<br>发送预设遗言</div>
+        <div class="reset-text" onclick="revive()">误报：点击解除警报</div>
+    </div>
+
+    <div class="modal" id="settings-modal">
+        <h3>设置</h3>
+        <label>确认周期 (小时)</label>
+        <input type="number" id="input-hours" value="24" min="1" max="72">
+        <label>预设遗言 (模拟)</label>
+        <input type="text" id="input-msg" value="如果我没消息了，请帮我清空浏览器记录。">
+        <div class="actions">
+            <button onclick="saveSettings()">保存</button>
+        </div>
+    </div>
+
+    <script>
+        // 配置与状态
+        let CONFIG = {
+            hours: 24,
+            message: "如果我没消息了，请帮我清空浏览器记录。"
+        };
+
+        let deadline = 0;
+        let timerInterval;
+
+        // 初始化
+        function init() {
+            loadState();
+            updateUI();
+            startTicker();
+        }
+
+        // 加载状态 (本地存储)
+        function loadState() {
+            const savedConfig = localStorage.getItem('slm_config');
+            const savedDeadline = localStorage.getItem('slm_deadline');
+
+            if (savedConfig) {
+                CONFIG = JSON.parse(savedConfig);
+                document.getElementById('input-hours').value = CONFIG.hours;
+                document.getElementById('input-msg').value = CONFIG.message;
+            }
+
+            if (savedDeadline) {
+                deadline = parseInt(savedDeadline);
+            } else {
+                // 第一次运行，默认给满时间
+                resetTimer();
+            }
+        }
+
+        // 保存配置
+        function saveSettings() {
+            const h = document.getElementById('input-hours').value;
+            const m = document.getElementById('input-msg').value;
+
+            CONFIG.hours = parseInt(h) || 24;
+            CONFIG.message = m;
+
+            localStorage.setItem('slm_config', JSON.stringify(CONFIG));
+            document.getElementById('settings-modal').style.display = 'none';
+            updateUI();
+
+            // 如果修改了时间，为了逻辑简单，建议提示用户手动重置，或者我们不重置当前倒计时，只改变周期显示
+            alert("设置已保存。请点击「一键续命」应用新的周期时长。");
+        }
+
+        // 核心：重置时间（续命）
+        function resetTimer() {
+            const now = new Date().getTime();
+            const durationMs = CONFIG.hours * 60 * 60 * 1000;
+            deadline = now + durationMs;
+
+            localStorage.setItem('slm_deadline', deadline);
+
+            // 恢复界面状态
+            document.getElementById('death-overlay').classList.remove('active');
+            document.body.style.backgroundColor = 'var(--bg-color)';
+            updateTimerDisplay(durationMs); // 立即刷新显示
+        }
+
+        // 从死亡状态恢复（误报处理）
+        function revive() {
+            resetTimer();
+        }
+
+        // 计时器逻辑
+        function startTicker() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const diff = deadline - now;
+
+                if (diff <= 0) {
+                    triggerDeath();
+                } else {
+                    updateTimerDisplay(diff);
+                }
+            }, 1000);
+        }
+
+        // 触发死亡状态
+        function triggerDeath() {
+            document.getElementById('timer').innerText = "00:00:00";
+            document.getElementById('death-overlay').classList.add('active');
+            // 模拟发送消息
+            console.log("正在发送遗言: " + CONFIG.message);
+        }
+
+        // 格式化时间显示
+        function updateTimerDisplay(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+
+            const format = (num) => num.toString().padStart(2, '0');
+            const timeStr = `${format(h)}:${format(m)}:${format(s)}`;
+
+            const timerEl = document.getElementById('timer');
+            timerEl.innerText = timeStr;
+
+            // 剩余时间少于1小时变红
+            if (h < 1) {
+                timerEl.classList.add('danger');
+            } else {
+                timerEl.classList.remove('danger');
+            }
+        }
+
+        // UI 辅助函数
+        function updateUI() {
+            document.getElementById('cycle-display').innerText = `周期: ${CONFIG.hours}小时`;
+        }
+
+        function openSettings() {
+            document.getElementById('settings-modal').style.display = 'block';
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+
+</html>
